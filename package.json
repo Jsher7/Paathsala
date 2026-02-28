@@ -1,0 +1,22 @@
+{
+  "name": "smart-college-platform",
+  "version": "1.0.0",
+  "description": "Smart College Education Platform with Auth0",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:clean": "kill -9 $(lsof -t -i:3001) $(lsof -t -i:5001); npm run dev",
+    "dev:client": "npm run dev --workspace=client",
+    "dev:server": "npm run dev --workspace=server",
+    "build": "npm run build --workspace=client",
+    "start": "npm run start --workspace=server",
+    "install:all": "npm install && npm install --workspace=client && npm install --workspace=server"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
