@@ -28,7 +28,7 @@ function DigitalIDCard() {
 
     return (
         <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl p-1 shadow-xl w-full max-w-sm mx-auto">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 relative overflow-hidden">
+            <div className="bg-white rounded-lg p-4 relative overflow-hidden">
                 {/* Watermark */}
                 <div className="absolute top-0 right-0 opacity-10 text-8xl font-bold text-indigo-600 transform translate-x-4 -translate-y-4">
                     ID
@@ -39,20 +39,20 @@ function DigitalIDCard() {
                         {user?.name?.charAt(0)}
                     </div>
                     <div>
-                        <h3 className="font-bold text-gray-900 dark:text-gray-100">{user?.name}</h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">{user?.role}</p>
+                        <h3 className="font-bold text-gray-900">{user?.name}</h3>
+                        <p className="text-sm text-gray-500 capitalize">{user?.role}</p>
                         <p className="text-xs text-gray-400">{user?.department}</p>
                     </div>
                 </div>
 
                 <div className="border-t border-dashed pt-4 flex justify-between items-center">
                     <div className="space-y-1">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">ID: {user?._id?.slice(-8).toUpperCase()}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Batch: {user?.batch || '2024'}</p>
+                        <p className="text-xs text-gray-500">ID: {user?._id?.slice(-8).toUpperCase()}</p>
+                        <p className="text-xs text-gray-500">Batch: {user?.batch || '2024'}</p>
                     </div>
 
                     {/* Secure QR Code */}
-                    <div className="bg-white dark:bg-gray-800 p-1 rounded shadow-sm">
+                    <div className="bg-white p-1 rounded shadow-sm">
                         <QRCodeSVG value={verifyData} size={64} level="H" />
                     </div>
                 </div>

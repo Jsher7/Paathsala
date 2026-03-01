@@ -13,17 +13,34 @@ router.get('/me', checkJwt, async (req, res) => {
     const role = req.auth['https://smart-college/role'] || 'student'
     const department = req.auth['https://smart-college/department'] || ''
 
+    // Extract device/IP info
+    const userAgent = req.headers['user-agent'] || 'Unknown Device'
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'Unknown'
+
     const updateData = { email, name };
     if (role && role !== 'student') updateData.role = role;
     if (department) updateData.department = department;
 
     let user = await User.findOneAndUpdate(
       { auth0Id },
-      { $set: updateData },
+      {
+        $set: {
+          ...updateData,
+          lastLoginAt: new Date(),
+          lastLoginDevice: userAgent,
+          lastLoginIP: ip
+        },
+        $inc: { loginCount: 1 },
+        $push: {
+          loginHistory: {
+            $each: [{ loginAt: new Date(), device: userAgent, ip }],
+            $slice: -20 // Keep only last 20 login records
+          }
+        }
+      },
       { upsert: true, new: true }
     )
 
-    // Send pending notifications count if user is found
     res.json({ user })
   } catch (error) {
     console.error('Error in /me route:', error)

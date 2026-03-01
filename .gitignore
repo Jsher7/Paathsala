@@ -34,3 +34,11 @@ coverage/
 # Misc
 *.bak
 *.tmp
+.vercel
+
+# Agent-related
+.agent/
+.agents/
+.claude/
+.trae/
+skills-lock.json

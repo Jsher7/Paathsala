@@ -9,7 +9,19 @@ const userSchema = new mongoose.Schema({
   batch: { type: Number },
   xp: { type: Number, default: 0 },
   passwordChanged: { type: Boolean, default: false },
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+
+  // Login Tracking
+  loginCount: { type: Number, default: 0 },
+  lastLoginAt: { type: Date },
+  lastLoginDevice: { type: String },
+  lastLoginIP: { type: String },
+  loginHistory: [{
+    loginAt: { type: Date, default: Date.now },
+    device: { type: String },
+    ip: { type: String },
+    _id: false
+  }]
 })
 
 export default mongoose.model('User', userSchema)

@@ -1,34 +1,28 @@
 import express from 'express'
-import { checkJwt, getAuth0Id } from '../middleware/auth.js'
-import LoginLog from '../models/LoginLog.js'
+import { checkJwt, getAuth0Id, requireRole } from '../middleware/auth.js'
 import User from '../models/User.js'
-import { 
-  logLoginEvent, 
-  getLoginHistory, 
+import {
+  logLoginEvent,
+  getLoginHistory,
   getUserLoginStats,
   getAllUsersLoginHistory,
   getGlobalSecurityStats,
   getUsersWithSuspiciousActivity,
   getUserSecurityTimeline
 } from '../services/securityService.js'
-import { verifyAuditTrail, getExplorerUrl } from '../services/algorandService.js'
+import { verifyAuditTrail, getExplorerUrl as getAlgoExplorerUrl } from '../services/algorandService.js'
+import { createAuditRecord, getAuditRecords, getExplorerUrl } from '../services/algorandAudit.js'
 import fetch from 'node-fetch'
 
 const router = express.Router()
 
-function requireRole(req, res, next, allowedRoles) {
-  const role = req.auth?.['https://smart-college/role'] || 'student'
-  if (!allowedRoles.includes(role)) {
-    return res.status(403).json({ error: 'Access denied' })
-  }
-  next()
-}
+// --- Original Advanced Routes ---
 
 router.get('/history', checkJwt, async (req, res) => {
   try {
     const auth0Id = getAuth0Id(req)
     const user = await User.findOne({ auth0Id })
-    
+
     if (!user) {
       return res.status(404).json({ error: 'User not found' })
     }
@@ -50,7 +44,7 @@ router.get('/stats', checkJwt, async (req, res) => {
   try {
     const auth0Id = getAuth0Id(req)
     const user = await User.findOne({ auth0Id })
-    
+
     if (!user) {
       return res.status(404).json({ error: 'User not found' })
     }
@@ -67,7 +61,7 @@ router.get('/timeline', checkJwt, async (req, res) => {
     const auth0Id = getAuth0Id(req)
     const user = await User.findOne({ auth0Id })
     const days = parseInt(req.query.days) || 30
-    
+
     if (!user) {
       return res.status(404).json({ error: 'User not found' })
     }
@@ -83,8 +77,8 @@ router.get('/verify/:txId', checkJwt, async (req, res) => {
   try {
     const { txId } = req.params
     const auditData = await verifyAuditTrail(txId)
-    const explorerUrl = getExplorerUrl(txId)
-    
+    const explorerUrl = getAlgoExplorerUrl(txId)
+
     if (!auditData) {
       return res.status(404).json({ error: 'Audit trail not found' })
     }
@@ -95,15 +89,13 @@ router.get('/verify/:txId', checkJwt, async (req, res) => {
   }
 })
 
-router.get('/admin/all-users', checkJwt, async (req, res) => {
+router.get('/admin/all-users', checkJwt, requireRole('admin'), async (req, res) => {
   try {
-    requireRole(req, res, () => {}, ['admin', 'hod'])
-    
-    const { 
-      limit, 
-      offset, 
-      eventType, 
-      isSuspicious, 
+    const {
+      limit,
+      offset,
+      eventType,
+      isSuspicious,
       userId,
       email,
       startDate,
@@ -127,10 +119,8 @@ router.get('/admin/all-users', checkJwt, async (req, res) => {
   }
 })
 
-router.get('/admin/stats', checkJwt, async (req, res) => {
+router.get('/admin/stats', checkJwt, requireRole('admin'), async (req, res) => {
   try {
-    requireRole(req, res, () => {}, ['admin', 'hod'])
-    
     const stats = await getGlobalSecurityStats()
     res.json(stats)
   } catch (error) {
@@ -138,10 +128,8 @@ router.get('/admin/stats', checkJwt, async (req, res) => {
   }
 })
 
-router.get('/admin/suspicious-users', checkJwt, async (req, res) => {
+router.get('/admin/suspicious-users', checkJwt, requireRole('admin'), async (req, res) => {
   try {
-    requireRole(req, res, () => {}, ['admin', 'hod'])
-    
     const days = parseInt(req.query.days) || 7
     const users = await getUsersWithSuspiciousActivity(days)
     res.json(users)
@@ -150,10 +138,8 @@ router.get('/admin/suspicious-users', checkJwt, async (req, res) => {
   }
 })
 
-router.get('/admin/user/:userId', checkJwt, async (req, res) => {
+router.get('/admin/user/:userId', checkJwt, requireRole('admin'), async (req, res) => {
   try {
-    requireRole(req, res, () => {}, ['admin', 'hod'])
-    
     const { userId } = req.params
     const { limit, offset, includeFailed } = req.query
 
@@ -182,7 +168,7 @@ router.post('/log', async (req, res) => {
 
     const eventData = req.body
     const log = await logLoginEvent(eventData)
-    
+
     res.json({ success: true, logId: log._id })
   } catch (error) {
     console.error('Failed to log login event:', error)
@@ -190,10 +176,8 @@ router.post('/log', async (req, res) => {
   }
 })
 
-router.get('/sync-auth0', checkJwt, async (req, res) => {
+router.get('/sync-auth0', checkJwt, requireRole('admin'), async (req, res) => {
   try {
-    requireRole(req, res, () => {}, ['admin'])
-    
     const token = await getManagementToken()
     const response = await fetch(
       `https://${process.env.AUTH0_DOMAIN}/api/v2/logs?sort=-date&per_page=100`,
@@ -204,7 +188,7 @@ router.get('/sync-auth0', checkJwt, async (req, res) => {
 
     const logs = await response.json()
     let synced = 0
-    
+
     for (const log of logs) {
       try {
         await logLoginEvent({
@@ -229,19 +213,96 @@ router.get('/sync-auth0', checkJwt, async (req, res) => {
   }
 })
 
-router.get('/admin/users-list', checkJwt, async (req, res) => {
+router.get('/admin/users-list', checkJwt, requireRole('admin'), async (req, res) => {
   try {
-    requireRole(req, res, () => {}, ['admin', 'hod'])
-    
     const users = await User.find({})
       .select('name email role department')
       .sort({ name: 1 })
-    
+
     res.json(users)
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
 })
+
+// --- Redesign UI Specific Routes ---
+
+router.get('/login-activity', checkJwt, async (req, res) => {
+  try {
+    const auth0Id = getAuth0Id(req)
+    const user = await User.findOne({ auth0Id }).select('loginCount lastLoginAt lastLoginDevice lastLoginIP loginHistory').lean()
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    res.json({
+      loginCount: user.loginCount || 0,
+      lastLoginAt: user.lastLoginAt,
+      lastLoginDevice: user.lastLoginDevice,
+      lastLoginIP: user.lastLoginIP,
+      loginHistory: (user.loginHistory || []).reverse() // Most recent first
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+router.get('/all-users-activity', checkJwt, requireRole('admin'), async (req, res) => {
+  try {
+    const users = await User.find({})
+      .select('name email role department loginCount lastLoginAt lastLoginDevice')
+      .sort({ lastLoginAt: -1 })
+      .lean()
+
+    res.json({ users })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+router.post('/audit', checkJwt, async (req, res) => {
+  try {
+    const auth0Id = getAuth0Id(req)
+    const user = await User.findOne({ auth0Id })
+    const { action, details } = req.body
+
+    if (!action) {
+      return res.status(400).json({ error: 'Action is required' })
+    }
+
+    const record = await createAuditRecord(action, user._id, {
+      ...details,
+      userName: user.name,
+      userEmail: user.email
+    })
+
+    res.json({
+      ...record,
+      explorerUrl: getExplorerUrl(record.txId)
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+router.get('/audit', checkJwt, async (req, res) => {
+  try {
+    const auth0Id = getAuth0Id(req)
+    const user = await User.findOne({ auth0Id })
+
+    const records = getAuditRecords(user._id).map(r => ({
+      ...r,
+      explorerUrl: getExplorerUrl(r.txId)
+    }))
+
+    res.json({ records })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// --- Helpers ---
 
 async function getManagementToken() {
   const response = await fetch(`https://${process.env.AUTH0_DOMAIN}/oauth/token`, {
