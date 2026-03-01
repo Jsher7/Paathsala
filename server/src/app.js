@@ -158,18 +158,22 @@ app.get('/api/health', (req, res) => {
 
 app.use(errorHandler)
 
+console.log('Starting server...')
+console.log('MONGODB_URI is defined:', !!process.env.MONGODB_URI)
+console.log('CLIENT_URL:', process.env.CLIENT_URL)
+
 const PORT = process.env.PORT || 5001
 
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/smart-college')
   .then(() => {
-    console.log('Connected to MongoDB')
+    console.log('SUCCESS: Connected to MongoDB')
     // Start httpServer instead of express app directly
     httpServer.listen(PORT, () => {
-      console.log(`Server & Socket.io running on port ${PORT}`)
+      console.log(`SUCCESS: Server & Socket.io running on port ${PORT}`)
     })
   })
   .catch((error) => {
-    console.error('MongoDB connection error:', error)
+    console.error('CRITICAL ERROR: MongoDB connection error details:', error)
     process.exit(1)
   })
 
